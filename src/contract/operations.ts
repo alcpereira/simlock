@@ -47,6 +47,7 @@ import {
   inboxItemSchema,
   waitingRequestSchema,
   capabilityListSchema,
+  WARM_POOL_LEARNED_KINDS_MAX,
   WARM_POOL_NAME_MAX,
   workerViewSchema,
 } from "./schemas.js";
@@ -617,7 +618,7 @@ export const warmForget = defineOperation({
     mode: z.enum(["slim", "full"]).optional(),
     imageTag: imageTagSchema.optional(),
   }),
-  output: z.object({ forgotten: z.array(warmKindSchema).max(32) }),
+  output: z.object({ forgotten: z.array(warmKindSchema).max(WARM_POOL_LEARNED_KINDS_MAX) }),
 });
 
 // fallow-ignore-next-line unused-export -- consumed only through the OPERATIONS registry, not by name; still public contract surface.

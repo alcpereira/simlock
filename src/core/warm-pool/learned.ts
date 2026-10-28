@@ -1,3 +1,4 @@
+import { WARM_POOL_LEARNED_KINDS_MAX } from "../../contract/index.js";
 import type { SqliteDatabase, SqliteSchemaOwner } from "../../ports/index.js";
 import type { StateDatabase } from "../../state/index.js";
 import type { Platform, VirtualSpec } from "../domain.js";
@@ -29,8 +30,6 @@ export const warmPoolOwner: SqliteSchemaOwner = {
 };
 
 const LEARNED_WINDOW_MS = 24 * 60 * 60 * 1000;
-
-const LEARNED_KINDS_PER_PLATFORM = 32;
 
 export interface LearnedKind {
   readonly spec: VirtualSpec;
@@ -81,7 +80,7 @@ export class LearnedKinds {
         .prepare(
           "SELECT id FROM warm_kinds WHERE platform = ? ORDER BY last_leased_at DESC, id DESC LIMIT -1 OFFSET ?",
         )
-        .all(spec.platform, LEARNED_KINDS_PER_PLATFORM);
+        .all(spec.platform, WARM_POOL_LEARNED_KINDS_MAX);
       for (const { id } of surplus) {
         database.prepare("DELETE FROM warm_kind_leases WHERE kind_id = ?").run(Number(id));
         database.prepare("DELETE FROM warm_kinds WHERE id = ?").run(Number(id));
