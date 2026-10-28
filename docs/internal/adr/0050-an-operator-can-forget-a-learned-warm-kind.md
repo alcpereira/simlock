@@ -48,7 +48,10 @@ line per kind, and asks for a pass.
 
 It does not act on a device. The device is no longer kept, so the reaper's
 idle rules shut it down and delete it through `ManagedDeviceLifecycle`,
-as for any idle device. A configured target is untouched. A gateway
+as for any idle device. A device that never served a lease is shut down
+by the pool's never-leased idle rule `idle.shutdownAfterMs` after it
+became ready, then deleted by `idle-destroy`. A configured target is
+untouched, its retry backoff included. A gateway
 refuses it with `UNSUPPORTED_IN_GATEWAY_MODE`, like `nuke.run`.
 
 The CLI is `simlock warm forget <platform> <model> [<os>] [--mode]
@@ -59,7 +62,8 @@ The protocol version rises by one.
 
 - Undoing a mistaken lease is one command. Both idle rules count from the
   lease's end, so a device whose lease ended long ago is shut down and
-  deleted on the reaper's next runs.
+  deleted on the reaper's next runs. A device that never served a lease
+  counts from when it became ready instead.
 - The next lease of the model learns the kind again.
 - Nobody notices a stray kind on a worker nobody watches: it holds its
   slot until another kind needs it, as before.
