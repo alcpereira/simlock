@@ -124,6 +124,7 @@ describe("loadConfig", () => {
       warmPool: {
         enabled: true,
         maxConcurrentBoots: 2,
+        learnedTtlMs: 604_800_000,
         reserveRunning: { android: 0, ios: 0 },
         targets: [],
         quarantine: {
@@ -566,6 +567,16 @@ describe("loadConfig", () => {
         );
       },
     );
+
+    it("defaults learnedTtlMs to seven days, takes a file value, and rejects one that is not a positive integer naming the key", async () => {
+      expect((await load()).warmPool.learnedTtlMs).toBe(7 * 24 * 60 * 60 * 1000);
+      expect((await load({ learnedTtlMs: 3_600_000 })).warmPool.learnedTtlMs).toBe(3_600_000);
+      for (const bad of [0, -1, 1.5, "7d", null]) {
+        await expect(load({ learnedTtlMs: bad }), JSON.stringify(bad)).rejects.toThrow(
+          'Invalid config value for "warmPool.learnedTtlMs": expected a positive integer',
+        );
+      }
+    });
   });
 
   it("rejects a quarantine backoff multiplier below 1", async () => {

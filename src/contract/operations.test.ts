@@ -33,6 +33,7 @@ const ROLE_MATRIX: ReadonlyArray<{
   { name: "list.get", input: {}, role: "admin" },
   { name: "cleanup.run", input: {}, role: "admin" },
   { name: "nuke.run", input: {}, role: "admin" },
+  { name: "warm.forget", input: { model: "Pixel", platform: "android" }, role: "admin" },
   { name: "config.get", input: {}, role: "admin" },
   { name: "daemon.stop", input: {}, role: "admin" },
   { name: "daemon.update", input: {}, role: "admin" },
@@ -121,6 +122,7 @@ const EFFECT_MATRIX: ReadonlyArray<{
   { name: "cleanup.run", input: { dryRun: false }, effect: "write" },
   { name: "cleanup.run", input: { dryRun: true }, effect: "read" },
   { name: "nuke.run", input: {}, effect: "write" },
+  { name: "warm.forget", input: { model: "Pixel", platform: "android" }, effect: "write" },
   { name: "config.get", input: {}, effect: "read" },
   { name: "daemon.stop", input: {}, effect: "write" },
   { name: "daemon.update", input: {}, effect: "write" },
@@ -1207,6 +1209,7 @@ describe("operation input/output round trips", () => {
       warmPool: {
         enabled: true,
         maxConcurrentBoots: 1,
+        learnedTtlMs: 604_800_000,
         reserveRunning: { android: 0, ios: 0 },
         targets: [],
         quarantine: {
@@ -1315,6 +1318,7 @@ describe("operation input/output round trips", () => {
       ...base,
       warmPool: {
         enabled: true,
+        learnedTtlMs: 1,
         reserveRunning: { android: 0, ios: 0 },
         quarantine: {
           maxRetries: 1,

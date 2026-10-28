@@ -158,7 +158,7 @@ The warm pool keeps idle devices booted, wiped and unleased, so a lease is grant
 
 It works from two lists:
 
-- **Kinds it learned.** Each time a device is leased, the pool records its kind (platform, model, OS version and mode). It then keeps as many of that kind booted as were leased at once at the busiest moment of the last 24 hours, at least one. It remembers up to 32 kinds per platform, dropping the oldest. The list survives a daemon restart.
+- **Kinds it learned.** Each time a device is leased, the pool records its kind (platform, model, OS version and mode). It then keeps as many of that kind booted as were leased at once at the busiest moment of the last 24 hours, at least one. It remembers up to 32 kinds per platform, dropping the oldest, and forgets a kind no lease has used for `warmPool.learnedTtlMs` (7 days). The list survives a daemon restart.
 - **Targets you set.** `warmPool.targets` names kinds to keep booted ahead of any lease.
 
 ```json title="~/.simlock/config.json"
@@ -189,6 +189,17 @@ Other settings:
 | `warmPool.enabled` | `false` keeps nothing booted: every idle device is shut down. | `true` |
 | `warmPool.reserveRunning.ios`, `.android` | Running slots that idle warm devices may not fill, so a lease for another kind never has to wait for a shutdown. Lease requests can still use them. | `0` |
 | `warmPool.maxConcurrentBoots` | Boots and creations in progress at once. | a quarter of the CPU cores, at least 1 |
+| `warmPool.learnedTtlMs` | How long a learned kind is kept after its last lease ended. A kind with a lease still held is never forgotten. | `604800000` (7 days) |
+
+### Forget a learned kind
+
+A lease of the wrong model, such as `--device Pixel` instead of `Pixel 9`, teaches the pool that kind too. Its device then stays booted and holds a running slot until `warmPool.learnedTtlMs` passes, or until a lease of another model needs the slot. To forget it now:
+
+```sh
+simlock warm forget android Pixel
+```
+
+The pool stops keeping the kind's devices. The [cleanup rules](/simlock/docs/worker/cleanup) then shut the idle device down after `idle.shutdownAfterMs` and delete it after `idle.deleteAfterMs`, both counted from its last lease. Add the OS version, `--mode` or `--image-tag` to forget only one kind of the model. See [`simlock warm forget`](/simlock/docs/reference/cli#simlock-warm-forget).
 
 ### Read the warm pool in `simlock status`
 

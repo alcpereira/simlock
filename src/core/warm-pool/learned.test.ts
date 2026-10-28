@@ -97,9 +97,11 @@ describe("LearnedKinds", () => {
       },
       {
         count: 1,
-        name: "no lease rows left",
-        rows: 1,
+        name: "only its last ended lease left, from before the window",
+        rows: 2,
         run: (kinds) => {
+          kinds.learn(phone, "older", T0 - 31 * HOUR);
+          kinds.ended("older", T0 - 30 * HOUR);
           kinds.learn(phone, "old", T0 - 30 * HOUR);
           kinds.ended("old", T0 - 29 * HOUR);
           kinds.learn(spec("iPad Pro"), "other", T0);
@@ -156,6 +158,91 @@ describe("LearnedKinds", () => {
     expect(after.some((kind) => kind.spec.model === "Phone 1")).toBe(true);
     expect(after.some((kind) => kind.spec.platform === "android")).toBe(true);
     expect(leaseRows(state)).toBe(33);
+  });
+
+  it("forgets a kind no lease has used for its TTL, counted from its last lease's end, and never one with a lease held", async () => {
+    const DAY = 24 * HOUR;
+    const TTL = 7 * DAY;
+    const models = (kinds: LearnedKinds, now: number) =>
+      kinds.kinds(now).map((kind) => kind.spec.model);
+    const { kinds, state } = await open();
+    const stray = spec("Pixel", { osVersion: "36", platform: "android" });
+    kinds.learn(stray, "stray", T0);
+    kinds.ended("stray", T0 + 1);
+    const long = spec("Pixel 9", { osVersion: "36", platform: "android" });
+    kinds.learn(long, "long", T0 - 10 * DAY);
+    kinds.ended("long", T0 + DAY);
+    const held = spec("Pixel 8", { osVersion: "35", platform: "android" });
+    kinds.learn(held, "held", T0 - 30 * DAY);
+    // why: a later grant prunes ended rows past the 24 h window; the long lease's end must survive it.
+    kinds.learn(spec("iPhone 16"), "later", T0 + 3 * DAY);
+    kinds.ended("later", T0 + 3 * DAY);
+
+    expect(models(kinds, T0 + 1 + TTL - 1)).toEqual(["iPhone 16", "Pixel", "Pixel 9", "Pixel 8"]);
+    expect(kinds.expire(T0 + 1 + TTL - 1)).toEqual([]);
+
+    expect(models(kinds, T0 + 1 + TTL)).toEqual(["iPhone 16", "Pixel 9", "Pixel 8"]);
+    expect(kinds.expire(T0 + 1 + TTL)).toEqual([stray]);
+    expect(
+      state.database.prepare("SELECT COUNT(*) AS n FROM warm_kinds WHERE model = 'Pixel'").get()?.n,
+    ).toBe(0);
+
+    expect(kinds.expire(T0 + DAY + TTL).map((gone) => gone.model)).toEqual(["Pixel 9"]);
+    expect(kinds.expire(T0 + 3 * DAY + TTL).map((gone) => gone.model)).toEqual(["iPhone 16"]);
+    expect(models(kinds, T0 + 100 * DAY)).toEqual(["Pixel 8"]);
+
+    const short = new LearnedKinds(state, HOUR);
+    kinds.ended("held", T0 + 100 * DAY);
+    expect(short.expire(T0 + 100 * DAY + HOUR - 1)).toEqual([]);
+    expect(short.expire(T0 + 100 * DAY + HOUR)).toEqual([held]);
+  });
+
+  it("forgetMatching forgets every kind of the model on its platform, narrowed by the OS, mode and image tag given, and answers them", async () => {
+    const pixel36 = spec("Pixel", { osVersion: "36", platform: "android" });
+    const pixel35 = spec("Pixel", { osVersion: "35", platform: "android" });
+    const tagged = spec("Pixel", { imageTag: "google_apis", osVersion: "35", platform: "android" });
+    const slim = spec("Pixel", { mode: "slim", osVersion: "36", platform: "android" });
+    const fill = async () => {
+      const opened = await open();
+      opened.kinds.learn(pixel36, "a", T0);
+      opened.kinds.learn(pixel35, "b", T0 + 1);
+      opened.kinds.learn(tagged, "c", T0 + 2);
+      opened.kinds.learn(slim, "d", T0 + 3);
+      opened.kinds.learn(spec("Pixel 9", { osVersion: "36", platform: "android" }), "e", T0 + 4);
+      opened.kinds.learn(spec("Pixel"), "f", T0 + 5);
+      return opened.kinds;
+    };
+    const cases: readonly {
+      readonly match: Parameters<LearnedKinds["forgetMatching"]>[0];
+      readonly forgotten: readonly VirtualSpec[];
+    }[] = [
+      {
+        forgotten: [slim, tagged, pixel35, pixel36],
+        match: { model: "Pixel", platform: "android" },
+      },
+      {
+        forgotten: [slim, pixel36],
+        match: { model: "Pixel", osVersion: "36", platform: "android" },
+      },
+      {
+        forgotten: [pixel36],
+        match: { mode: "full", model: "Pixel", osVersion: "36", platform: "android" },
+      },
+      {
+        forgotten: [pixel35],
+        match: { imageTag: "", model: "Pixel", osVersion: "35", platform: "android" },
+      },
+      {
+        forgotten: [tagged],
+        match: { imageTag: "google_apis", model: "Pixel", platform: "android" },
+      },
+      { forgotten: [], match: { model: "Pixel 7", platform: "android" } },
+    ];
+    for (const { forgotten, match } of cases) {
+      const kinds = await fill();
+      expect(kinds.forgetMatching(match), JSON.stringify(match)).toEqual(forgotten);
+      expect(kinds.kinds(T0 + 10), JSON.stringify(match)).toHaveLength(6 - forgotten.length);
+    }
   });
 
   it("survives a reopen of the same file, and forget and clear remove the rows", async () => {

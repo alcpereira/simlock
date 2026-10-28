@@ -40,6 +40,7 @@ const config: Config = {
   warmPool: {
     enabled: true,
     maxConcurrentBoots: 1,
+    learnedTtlMs: 604_800_000,
     reserveRunning: { android: 0, ios: 0 },
     targets: [],
     quarantine: {

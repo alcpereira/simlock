@@ -8,15 +8,15 @@ Flows: [startup](../../../docs/internal/flows/startup.md). Parent: [core](../AGE
 
 ## Files
 
-| File               | Role                                                                                                                     |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| `converger.ts`     | `WarmPool`: triggers, one pass at a time, acts, `figures()`, `warm-pool.target-missed`                                   |
-| `policy.ts`        | `evaluate`: pure; proposals and per-target reports; `targetedDevices`, `reservedRunning`                                 |
-| `learned.ts`       | `warmPoolOwner` (`state.db` tables `warm_kinds`, `warm_kind_leases`), `LearnedKinds`: the kinds leased, their 24 h peak  |
-| `catalog-check.ts` | `CatalogCheck`: one catalog read per platform beside a pass, 30 s limit; says which learned kinds are gone or unanswered |
-| `retry.ts`         | `RetrySchedule`: a target's failed boot or creation, keyed by resolved spec                                              |
-| `config.ts`        | `WarmPoolConfig`, `defaultWarmPoolConfig(systemStats)`, validators                                                       |
-| `figures.ts`       | `WarmPoolFigures`, `WarmTargetFigures`                                                                                   |
+| File               | Role                                                                                                                                              |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `converger.ts`     | `WarmPool`: triggers, one pass at a time, acts, `figures()`, `warm-pool.target-missed`                                                            |
+| `policy.ts`        | `evaluate`: pure; proposals and per-target reports; `targetedDevices`, `reservedRunning`                                                          |
+| `learned.ts`       | `warmPoolOwner` (`state.db` tables `warm_kinds`, `warm_kind_leases`), `LearnedKinds`: the kinds leased, their 24 h peak, expiry, `forgetMatching` |
+| `catalog-check.ts` | `CatalogCheck`: one catalog read per platform beside a pass, 30 s limit; says which learned kinds are gone or unanswered                          |
+| `retry.ts`         | `RetrySchedule`: a target's failed boot or creation, keyed by resolved spec                                                                       |
+| `config.ts`        | `WarmPoolConfig`, `defaultWarmPoolConfig(systemStats)`, validators                                                                                |
+| `figures.ts`       | `WarmPoolFigures`, `WarmTargetFigures`                                                                                                            |
 
 ## How it works
 
@@ -32,7 +32,12 @@ quarantined or reserved device holds (`RunningCapacity`), per platform and globa
    **Learn** — on `lease.granted` the leased device's kind is recorded (not a physical device, not
    with the pool off); `lease.released` and `lease.expired` close its lease row; `start()` closes
    rows whose lease the registry no longer holds. Each kind's count is its peak of leases held at
-   once in the last 24 h, at least 1; 32 kinds per platform, the oldest dropped.
+   once in the last 24 h, at least 1; 32 kinds per platform, the oldest dropped. Each write prunes lease
+   rows that ended over 24 h ago but each kind's last ended one. **Expire** (ADR 0050) — each pass forgets,
+   with one `info` line, a kind with no lease held whose last grant and last lease end are both at
+   least `warmPool.learnedTtlMs` ago; `kinds()` leaves it out from that moment, so `targeted()` stops
+   sparing its device before the pass. `forgetKinds(match)` (`warm.forget`, through `core.warmKinds`)
+   forgets every kind of a platform's model, narrowed by OS, mode and image tag, logs each and asks for a pass.
 3. **Resolve** — each target (a learned kind needs none; the catalog check forgets one whose model,
    OS, image tag or driver is gone, and a third failed boot in a row forgets it too) through `warmPoolDemand.resolve`, downloads off, every pass.
    A kind whose platform has no catalog answer yet (read pending, failed or timed out) is kept and planned for nothing that pass.
@@ -100,6 +105,7 @@ Stop: `close()` at stop start; `drain()` finishes the pass and running boots, st
 | Targets                                 | none, at most 256                   | `warmPool.targets`               |
 | Boots and creations in flight at once   | `max(1, floor(cpuCount / 4))`       | `warmPool.maxConcurrentBoots`    |
 | Never-leased idle                       | 10 min                              | `idle.shutdownAfterMs`           |
+| Learned kind kept after its last lease  | 7 days                              | `warmPool.learnedTtlMs`          |
 | Tick; pause after a failed shutdown     | 30 s                                | `WARM_POOL_TICK_MS`              |
 | Target retry                            | 60 s, doubling, cap 10 min          | `RETRY_FIRST_MS`, `RETRY_MAX_MS` |
 

@@ -37,7 +37,7 @@ import {
 } from "./policy.js";
 import type { WarmPoolFigures, WarmTargetFigures } from "./figures.js";
 import { CatalogCheck } from "./catalog-check.js";
-import { type LearnedKind, LearnedKinds } from "./learned.js";
+import { type LearnedKind, type LearnedKindMatch, LearnedKinds } from "./learned.js";
 import { RetrySchedule } from "./retry.js";
 
 export interface WarmPoolOptions {
@@ -155,7 +155,7 @@ export class WarmPool {
 
   constructor(private readonly options: WarmPoolOptions) {
     this.#logger = options.logger?.child("warm-pool") ?? new NoopLogger();
-    this.#learned = new LearnedKinds(options.state);
+    this.#learned = new LearnedKinds(options.state, options.config.learnedTtlMs);
     this.#catalogCheck = new CatalogCheck({
       catalog: options.catalog,
       clock: options.clock,
@@ -179,6 +179,20 @@ export class WarmPool {
   /** why: forgets every learned kind, as nuke starts the pool over; the next lease learns its kind again. */
   forget(): void {
     this.#learned.clear();
+  }
+
+  /**
+   * why: an operator's undo of a mistaken lease. Forgets every learned kind of the model the match
+   * narrows to and asks for a pass; the kind's devices are then left to the idle rules, which shut
+   * them down and delete them. A configured target is untouched. Answers the kinds forgotten.
+   */
+  forgetKinds(match: LearnedKindMatch): VirtualSpec[] {
+    const forgotten = this.#learned.forgetMatching(match);
+    for (const spec of forgotten) {
+      this.#logger.info("a warm pool learned kind was forgotten by the operator", kindFields(spec));
+    }
+    if (forgotten.length > 0) this.#trigger();
+    return forgotten;
   }
 
   /** why: the pool learns from committed facts on the bus, never from the lease path (ADR 0017 §3). */
@@ -413,6 +427,14 @@ export class WarmPool {
 
   /** why: forgets the kinds the last catalog answers no longer list, then starts the next reads without waiting for them. */
   #checkCatalog(): void {
+    this.#recording("forget its expired kinds", () => {
+      for (const spec of this.#learned.expire(this.options.clock.now())) {
+        this.#logger.info(
+          "a warm pool learned kind was forgotten: no lease used it for warmPool.learnedTtlMs",
+          kindFields(spec),
+        );
+      }
+    });
     const kinds = this.#learnedKinds();
     for (const kind of this.#catalogCheck.gone(kinds)) {
       this.#recording("forget a kind", () => this.#learned.forget(kind.spec));
@@ -886,3 +908,13 @@ const TRIGGERS = [
   "capacity.changed",
   "lease.queued",
 ] as const;
+
+function kindFields(spec: VirtualSpec): Record<string, string> {
+  return {
+    model: spec.model,
+    osVersion: spec.osVersion,
+    platform: spec.platform,
+    ...(spec.mode === undefined ? {} : { mode: spec.mode }),
+    ...(spec.imageTag === undefined ? {} : { imageTag: spec.imageTag }),
+  };
+}
