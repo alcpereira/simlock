@@ -190,8 +190,8 @@ describe("LearnedKinds", () => {
         match: { mode: "full", model: "Pixel", osVersion: "36", platform: "android" },
       },
       {
-        forgotten: [pixel35],
-        match: { imageTag: "", model: "Pixel", osVersion: "35", platform: "android" },
+        forgotten: [tagged, pixel35],
+        match: { model: "Pixel", osVersion: "35", platform: "android" },
       },
       {
         forgotten: [tagged],

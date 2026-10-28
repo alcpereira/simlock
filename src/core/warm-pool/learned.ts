@@ -184,6 +184,7 @@ export interface LearnedKindMatch {
 }
 
 // why: a field the caller left out matches every kind; mode and image tag compare as stored, full and "" when unset.
+// A given image tag is never empty (the contract refuses one), so it never matches an untagged kind.
 function matches(spec: VirtualSpec, match: LearnedKindMatch): boolean {
   const stored: Readonly<Record<keyof LearnedKindMatch, string>> = {
     imageTag: spec.imageTag ?? "",
