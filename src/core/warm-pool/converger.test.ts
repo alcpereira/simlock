@@ -2754,6 +2754,32 @@ describe("warm pool learned kinds", () => {
     ).toEqual([{ model: "iPhone 15", osVersion: "26.0", platform: "ios" }]);
   });
 
+  it("forgetKinds keeps the retry backoff of a failing configured target of the forgotten kind's spec", async () => {
+    const phone = device("d1", "ready", 0).spec;
+    const state = await openMemoryState([warmPoolOwner]);
+    new LearnedKinds(state).learn(phone, "l1", now - 2 * minute);
+    new LearnedKinds(state).ended("l1", now - minute);
+    const rig = harness([device("shut", "shutdown", 60 * minute)], {
+      boot: async () => {
+        throw new Error("simulator did not boot");
+      },
+      catalog: async () => [iosListing],
+      state,
+      targets: [{ count: 1, model: "iPhone 15", osVersion: "26.0", platform: "ios" }],
+    });
+    await rig.pool.pass();
+    await rig.pool.settle();
+    expect(rig.bootCalls).toHaveLength(1);
+
+    expect(rig.pool.forgetKinds({ model: "iPhone 15", platform: "ios" })).toEqual([phone]);
+    await rig.pool.settle();
+    expect(rig.bootCalls).toHaveLength(1);
+
+    rig.clock.advance(minute);
+    await rig.pool.settle();
+    expect(rig.bootCalls).toHaveLength(2);
+  });
+
   it("forgets a learned kind on its third failed boot or creation in a row with one warning, and a success in between, a forgetting or an operator's forget resets the count, and a configured target's kind is never forgotten", async () => {
     const phone = device("d1", "ready", 0).spec;
     const configured: WarmTarget = {

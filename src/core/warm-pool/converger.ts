@@ -184,12 +184,14 @@ export class WarmPool {
   /**
    * why: an operator's undo of a mistaken lease. Forgets every learned kind of the model the match
    * narrows to and asks for a pass; the kind's devices are then left to the idle rules, which shut
-   * them down and delete them. A configured target is untouched. Answers the kinds forgotten.
+   * them down and delete them. A configured target is untouched, its retry backoff included.
+   * Answers the kinds forgotten.
    */
   forgetKinds(match: LearnedKindMatch): VirtualSpec[] {
     const forgotten = this.#learned.forgetMatching(match);
     for (const spec of forgotten) {
-      this.#schedule.succeeded(spec);
+      if (!this.#resolved.some((configured) => sameSpec(configured.spec, spec)))
+        this.#schedule.succeeded(spec);
       this.#logger.info("a warm pool learned kind was forgotten by the operator", kindFields(spec));
     }
     if (forgotten.length > 0) this.#trigger();
