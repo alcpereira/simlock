@@ -946,7 +946,6 @@ export const configSchema = z.object({
     enabled: z.boolean(),
     reserveRunning: z.object({ ios: z.number(), android: z.number() }),
     maxConcurrentBoots: z.number(),
-    learnedTtlMs: z.number(),
     targets: z.array(
       z.object({
         platform: z.enum(["ios", "android"]),

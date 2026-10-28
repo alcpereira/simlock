@@ -155,7 +155,7 @@ export class WarmPool {
 
   constructor(private readonly options: WarmPoolOptions) {
     this.#logger = options.logger?.child("warm-pool") ?? new NoopLogger();
-    this.#learned = new LearnedKinds(options.state, options.config.learnedTtlMs);
+    this.#learned = new LearnedKinds(options.state);
     this.#catalogCheck = new CatalogCheck({
       catalog: options.catalog,
       clock: options.clock,
@@ -427,14 +427,6 @@ export class WarmPool {
 
   /** why: forgets the kinds the last catalog answers no longer list, then starts the next reads without waiting for them. */
   #checkCatalog(): void {
-    this.#recording("forget its expired kinds", () => {
-      for (const spec of this.#learned.expire(this.options.clock.now())) {
-        this.#logger.info(
-          "a warm pool learned kind was forgotten: no lease used it for warmPool.learnedTtlMs",
-          kindFields(spec),
-        );
-      }
-    });
     const kinds = this.#learnedKinds();
     for (const kind of this.#catalogCheck.gone(kinds)) {
       this.#recording("forget a kind", () => this.#learned.forget(kind.spec));

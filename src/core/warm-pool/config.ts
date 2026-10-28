@@ -12,7 +12,6 @@ import {
   stringUnion,
   type Validator,
 } from "../validation.js";
-import { LEARNED_TTL_DEFAULT_MS } from "./learned.js";
 
 /**
  * A kind of device the pool keeps booted, clean and unleased: written like a lease request, with
@@ -38,14 +37,11 @@ export interface WarmPoolConfig {
   readonly targets: readonly WarmTarget[];
   /** why: the most boots and creations in flight at once: the pool's own, for waiters and targets, and each waiting request's own. */
   readonly maxConcurrentBoots: number;
-  /** why: how long a learned kind no lease uses is kept; past it the kind is forgotten and its device left to the idle rules. */
-  readonly learnedTtlMs: number;
 }
 
 export function defaultWarmPoolConfig(systemStats: SystemStats): WarmPoolConfig {
   return {
     enabled: true,
-    learnedTtlMs: LEARNED_TTL_DEFAULT_MS,
     maxConcurrentBoots: Math.max(1, Math.floor(systemStats.cpuCount() / 4)),
     reserveRunning: { android: 0, ios: 0 },
     targets: [],
@@ -111,7 +107,6 @@ const targetsValidator: Validator = (value, path, warn) => {
 /** The validators for the keys this module owns, composed into the `warmPool` object. */
 export const warmPoolConfigValidator: Readonly<Record<keyof WarmPoolConfig, Validator>> = {
   enabled: booleanValue,
-  learnedTtlMs: positiveInteger,
   maxConcurrentBoots: positiveInteger,
   reserveRunning: objectValidator({ android: nonNegativeInteger, ios: nonNegativeInteger }),
   targets: targetsValidator,

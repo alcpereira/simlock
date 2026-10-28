@@ -1209,7 +1209,6 @@ describe("operation input/output round trips", () => {
       warmPool: {
         enabled: true,
         maxConcurrentBoots: 1,
-        learnedTtlMs: 604_800_000,
         reserveRunning: { android: 0, ios: 0 },
         targets: [],
         quarantine: {
@@ -1318,7 +1317,6 @@ describe("operation input/output round trips", () => {
       ...base,
       warmPool: {
         enabled: true,
-        learnedTtlMs: 1,
         reserveRunning: { android: 0, ios: 0 },
         quarantine: {
           maxRetries: 1,

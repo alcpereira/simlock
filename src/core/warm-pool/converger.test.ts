@@ -115,7 +115,6 @@ function harness(
     refuseClaim?: boolean;
     targets?: readonly WarmTarget[];
     maxConcurrentBoots?: number;
-    learnedTtlMs?: number;
     /** The mode a request naming none plans on iOS: `ios.defaultMode`; full when none is set. */
     defaultMode?: "slim" | "full";
     /** What a target resolves to; by default the request's own model and OS (26.0 when none). */
@@ -263,7 +262,6 @@ function harness(
     clock,
     config: {
       enabled: options.enabled ?? true,
-      learnedTtlMs: options.learnedTtlMs ?? 7 * 24 * 60 * minute,
       maxConcurrentBoots: options.maxConcurrentBoots ?? 1,
       reserveRunning: { android: 0, ios: 0 },
       targets: options.targets ?? [],
@@ -2728,42 +2726,6 @@ describe("warm pool learned kinds", () => {
       expect(
         real.database.prepare("SELECT lease_id FROM warm_kind_leases WHERE ended_at IS NULL").all(),
       ).toEqual([{ lease_id: "again" }, { lease_id: "ghost" }]);
-    });
-  });
-
-  it("forgets on a pass, with one info line, a learned kind no lease used for warmPool.learnedTtlMs, and targeted() stops naming its device before that pass", async () => {
-    const phone = device("stray", "ready", 0).spec;
-    const run = async (learnedTtlMs: number) => {
-      const state = await openMemoryState([warmPoolOwner]);
-      new LearnedKinds(state).learn(phone, "l1", now - 3 * 60 * minute);
-      new LearnedKinds(state).ended("l1", now - 2 * 60 * minute);
-      const rig = harness([device("stray", "ready", 2 * 60 * minute)], {
-        catalog: async () => [iosListing],
-        learnedTtlMs,
-        state,
-      });
-      const targeted = [...(await rig.pool.targeted())];
-      await rig.pool.pass();
-      await rig.pool.settle();
-      return {
-        kinds: new LearnedKinds(state).kinds(now).length,
-        lines: rig.sink.records
-          .filter((record) => record.message.includes("warmPool.learnedTtlMs"))
-          .map((record) => [record.message, record.fields]),
-        targeted,
-      };
-    };
-
-    expect(await run(3 * 60 * minute)).toEqual({ kinds: 1, lines: [], targeted: ["stray"] });
-    expect(await run(2 * 60 * minute)).toEqual({
-      kinds: 0,
-      lines: [
-        [
-          "a warm pool learned kind was forgotten: no lease used it for warmPool.learnedTtlMs",
-          { model: "iPhone 15", osVersion: "26.0", platform: "ios" },
-        ],
-      ],
-      targeted: [],
     });
   });
 
