@@ -1658,6 +1658,18 @@ describe("Dispatcher: warm.forget", () => {
     });
     expect(matches).toEqual([{ model: "Pixel", platform: "android" }]);
   });
+
+  it("answers INTERNAL with no warm pool wired", async () => {
+    const { dispatcher } = await buildDispatcher();
+
+    await expect(
+      dispatcher.dispatch(
+        "warm.forget",
+        { model: "Pixel", platform: "android" },
+        session({ role: "admin" }),
+      ),
+    ).rejects.toMatchObject({ code: "INTERNAL", message: "The warm pool is unavailable" });
+  });
 });
 
 describe("Dispatcher: device mode on every surface", () => {
