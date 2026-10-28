@@ -189,6 +189,7 @@ export class WarmPool {
   forgetKinds(match: LearnedKindMatch): VirtualSpec[] {
     const forgotten = this.#learned.forgetMatching(match);
     for (const spec of forgotten) {
+      this.#schedule.succeeded(spec);
       this.#logger.info("a warm pool learned kind was forgotten by the operator", kindFields(spec));
     }
     if (forgotten.length > 0) this.#trigger();

@@ -2754,7 +2754,7 @@ describe("warm pool learned kinds", () => {
     ).toEqual([{ model: "iPhone 15", osVersion: "26.0", platform: "ios" }]);
   });
 
-  it("forgets a learned kind on its third failed boot or creation in a row with one warning, and a success in between or a forgetting resets the count, and a configured target's kind is never forgotten", async () => {
+  it("forgets a learned kind on its third failed boot or creation in a row with one warning, and a success in between, a forgetting or an operator's forget resets the count, and a configured target's kind is never forgotten", async () => {
     const phone = device("d1", "ready", 0).spec;
     const configured: WarmTarget = {
       count: 1,
@@ -2765,7 +2765,7 @@ describe("warm pool learned kinds", () => {
     const run = async (
       outcomes: readonly ("fail" | "ok")[],
       creation: boolean,
-      options: { relearnAt?: number; targets?: WarmTarget[] } = {},
+      options: { forgetAt?: number; relearnAt?: number; targets?: WarmTarget[] } = {},
     ) => {
       const state = await openMemoryState([warmPoolOwner]);
       new LearnedKinds(state).learn(phone, "l1", now - 2 * minute);
@@ -2788,7 +2788,9 @@ describe("warm pool learned kinds", () => {
         },
       );
       for (let round = 0; round < outcomes.length; round += 1) {
-        if (round === options.relearnAt) {
+        if (round === options.forgetAt)
+          rig.pool.forgetKinds({ model: phone.model, platform: "ios" });
+        if (round === options.relearnAt || round === options.forgetAt) {
           new LearnedKinds(state).learn(phone, "l2", rig.clock.now() - 2 * minute);
           new LearnedKinds(state).ended("l2", rig.clock.now() - minute);
         }
@@ -2820,6 +2822,9 @@ describe("warm pool learned kinds", () => {
       expect(two.kinds, `creation ${creation}`).toBe(1);
       const again = await run(["fail", "fail", "fail", "fail"], creation, { relearnAt: 3 });
       expect(again.kinds, `creation ${creation}`).toBe(1);
+      const forgot = await run(["fail", "fail", "fail"], creation, { forgetAt: 2 });
+      expect(forgot.kinds, `creation ${creation}`).toBe(1);
+      expect(forgot.warnings).toEqual([]);
       const kept = await run(["fail", "fail", "fail"], creation, { targets: [configured] });
       expect(kept.kinds, `creation ${creation}`).toBe(1);
       expect(kept.warnings).toEqual([]);

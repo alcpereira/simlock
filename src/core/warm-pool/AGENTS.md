@@ -34,7 +34,7 @@ quarantined or reserved device holds (`RunningCapacity`), per platform and globa
    rows whose lease the registry no longer holds. Each kind's count is its peak of leases held at
    once in the last 24 h, at least 1; 32 kinds per platform, the oldest dropped.
    **Forget** (ADR 0050) — `forgetKinds(match)` (`warm.forget`, through `core.warmKinds`) forgets every
-   kind of a platform's model, narrowed by OS, mode and image tag, logs one `info` line each and asks
+   kind of a platform's model, narrowed by OS, mode and image tag, drops each one's failed-boot count, logs one `info` line each and asks
    for a pass; the devices it kept are left to the reaper's idle rules.
 3. **Resolve** — each target (a learned kind needs none; the catalog check forgets one whose model,
    OS, image tag or driver is gone, and a third failed boot in a row forgets it too) through `warmPoolDemand.resolve`, downloads off, every pass.
