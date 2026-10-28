@@ -786,7 +786,8 @@ export class Dispatcher {
   };
 
   #warmForget: Handler<"warm.forget"> = async (input) => {
-    if (this.options.warmKinds === undefined) throw new Error("The warm pool is unavailable");
+    if (this.options.warmKinds === undefined)
+      throw new DispatchError("INTERNAL", "The warm pool is unavailable");
     const forgotten = this.options.warmKinds.forget(input);
     return {
       forgotten: forgotten.map((spec) => ({
