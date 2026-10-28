@@ -1,4 +1,5 @@
 import { commandArgs, subcommandOrUsage, UsageError, withHelpHint, writeResult } from "../args.js";
+import type { WarmForgetOutput } from "../../admin/index.js";
 import { connectDaemonClient } from "../connect.js";
 import type { CommandContext } from "../tree.js";
 
@@ -33,7 +34,7 @@ async function run(argv: readonly string[], context: CommandContext): Promise<nu
   if (mode !== undefined && mode !== "slim" && mode !== "full") {
     throw new UsageError(withHelpHint("--mode is slim or full"));
   }
-  const imageTag = values["image-tag"];
+  const imageTag = typeof values["image-tag"] === "string" ? values["image-tag"] : undefined;
   const client = await connectDaemonClient(environment, token);
   try {
     const result = await client.forgetWarmKind({
@@ -41,32 +42,39 @@ async function run(argv: readonly string[], context: CommandContext): Promise<nu
       platform,
       ...(osVersion === undefined ? {} : { osVersion }),
       ...(mode === undefined ? {} : { mode }),
-      ...(typeof imageTag === "string" ? { imageTag } : {}),
+      ...(imageTag === undefined ? {} : { imageTag }),
     });
     if (values.json) writeResult((value) => environment.stdout.write(value), result);
-    else environment.stdout.write(describe(result.forgotten, `${platform} ${model}`));
+    else {
+      const asked = { imageTag, mode, model, osVersion, platform };
+      environment.stdout.write(describe(result.forgotten, asked));
+    }
     return 0;
   } finally {
     await client.close();
   }
 }
 
-function describe(
-  forgotten: readonly {
-    readonly platform: string;
-    readonly model: string;
-    readonly osVersion: string;
-    readonly mode: string;
-    readonly imageTag?: string | undefined;
-  }[],
-  asked: string,
-): string {
-  if (forgotten.length === 0) return `The warm pool has learned no kind of ${asked}.\n`;
-  const lines = forgotten.map(
-    (kind) =>
-      `Forgot ${kind.platform} ${kind.model} ${kind.osVersion} (${kind.mode}${kind.imageTag === undefined ? "" : `, ${kind.imageTag}`}).\n`,
-  );
-  return `${lines.join("")}Its idle devices are no longer kept warm: the idle rules shut them down and delete them.\n`;
+interface Kind {
+  readonly platform: string;
+  readonly model: string;
+  readonly osVersion?: string | undefined;
+  readonly mode?: string | undefined;
+  readonly imageTag?: string | undefined;
+}
+
+function describe(forgotten: WarmForgetOutput["forgotten"], asked: Kind): string {
+  if (forgotten.length === 0)
+    return `The warm pool has learned no kind matching ${named(asked)}.\n`;
+  const lines = forgotten.map((kind) => `Forgot ${named(kind)}.\n`);
+  return `${lines.join("")}Its idle devices are no longer kept warm: the idle rules shut them down and delete them, unless a configured warmPool.targets entry keeps them.\n`;
+}
+
+// why: one spelling for a kind forgotten and a kind asked for: the words given, then mode and image tag in brackets.
+function named(kind: Kind): string {
+  const words = [kind.platform, kind.model, kind.osVersion].filter((word) => word !== undefined);
+  const details = [kind.mode, kind.imageTag].filter((detail) => detail !== undefined);
+  return details.length === 0 ? words.join(" ") : `${words.join(" ")} (${details.join(", ")})`;
 }
 
 export { run };

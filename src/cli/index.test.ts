@@ -4847,21 +4847,17 @@ describe("CLI: warm forget", () => {
     const forgot = await runWarm(["warm", "forget", "android", "Pixel"]);
     expect([forgot.code, forgot.stdout, forgot.inputs]).toEqual([
       0,
-      "Forgot android Pixel 36 (full).\nIts idle devices are no longer kept warm: the idle rules shut them down and delete them.\n",
+      "Forgot android Pixel 36 (full).\nIts idle devices are no longer kept warm: the idle rules shut them down and delete them, unless a configured warmPool.targets entry keeps them.\n",
       [{ model: "Pixel", platform: "android" }],
     ]);
 
-    const narrowed = await runWarm([
-      "warm",
-      "forget",
-      "android",
-      "Pixel",
-      "36",
-      "--mode",
-      "full",
-      "--image-tag",
-      "google_apis",
-    ]);
+    const narrowed = await runWarm(
+      ["warm", "forget", "android", "Pixel", "36", "--mode", "full", "--image-tag", "google_apis"],
+      [],
+    );
+    expect(narrowed.stdout).toBe(
+      "The warm pool has learned no kind matching android Pixel 36 (full, google_apis).\n",
+    );
     expect(narrowed.inputs).toEqual([
       {
         imageTag: "google_apis",
@@ -4875,7 +4871,7 @@ describe("CLI: warm forget", () => {
     const none = await runWarm(["warm", "forget", "ios", "iPhone 16"], []);
     expect([none.code, none.stdout]).toEqual([
       0,
-      "The warm pool has learned no kind of ios iPhone 16.\n",
+      "The warm pool has learned no kind matching ios iPhone 16.\n",
     ]);
 
     const json = await runWarm(["warm", "forget", "android", "Pixel", "--json"]);
