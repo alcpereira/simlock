@@ -198,7 +198,7 @@ A lease of the wrong model, such as `--device Pixel` instead of `Pixel 9`, teach
 simlock warm forget android Pixel
 ```
 
-The pool stops keeping the kind's devices. The [cleanup rules](/simlock/docs/worker/cleanup) then shut the idle device down after `idle.shutdownAfterMs` and delete it after `idle.deleteAfterMs`, both counted from its last lease. Add the OS version, `--mode` or `--image-tag` to forget only one kind of the model. See [`simlock warm forget`](/simlock/docs/reference/cli#simlock-warm-forget).
+The pool stops keeping the kind's devices. The [cleanup rules](/simlock/docs/worker/cleanup) then shut the idle device down after `idle.shutdownAfterMs` and delete it after `idle.deleteAfterMs`, both counted from its last lease. A device that never served a lease is shut down `idle.shutdownAfterMs` after it became ready and deleted `idle.deleteAfterMs` after its shutdown. Add the OS version, `--mode` or `--image-tag` to forget only one kind of the model. See [`simlock warm forget`](/simlock/docs/reference/cli#simlock-warm-forget).
 
 ### Read the warm pool in `simlock status`
 
