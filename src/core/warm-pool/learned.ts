@@ -184,13 +184,17 @@ export interface LearnedKindMatch {
   readonly imageTag?: string | undefined;
 }
 
+// why: a field the caller left out matches every kind; mode and image tag compare as stored, full and "" when unset.
 function matches(spec: VirtualSpec, match: LearnedKindMatch): boolean {
-  return (
-    spec.platform === match.platform &&
-    spec.model === match.model &&
-    (match.osVersion === undefined || spec.osVersion === match.osVersion) &&
-    (match.mode === undefined || (spec.mode ?? "full") === match.mode) &&
-    (match.imageTag === undefined || (spec.imageTag ?? "") === match.imageTag)
+  const stored: Readonly<Record<keyof LearnedKindMatch, string>> = {
+    imageTag: spec.imageTag ?? "",
+    mode: spec.mode ?? "full",
+    model: spec.model,
+    osVersion: spec.osVersion,
+    platform: spec.platform,
+  };
+  return Object.entries(match).every(
+    ([key, value]) => value === undefined || stored[key as keyof LearnedKindMatch] === value,
   );
 }
 
