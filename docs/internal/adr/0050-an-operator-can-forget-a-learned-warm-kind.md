@@ -19,8 +19,10 @@ emulator has stayed booted: `status` shows `managed 2/2, running 2`, and
 That is ADR 0038 working as written. The kind `android/Pixel/36/full` is
 learned; `targetedDevices()` keeps one ready device of every learned kind,
 so `idle-shutdown` spares it and `idle-destroy` never sees it. Leasing
-evicts it when another model needs the slot, and a newer learned kind
-displaces it (§3), so nothing is blocked. But the slot and its RAM are
+evicts it when another model needs the slot, a newer learned kind
+displaces it (§3), and so does a configured target short for its slot
+([ADR 0051](0051-configured-warm-targets-come-first-and-learning-can-be-turned-off.md)
+§2), so nothing is blocked. But the slot and its RAM are
 spent on a kind nobody wants until then.
 
 There is no supported way to undo one mistaken lease. `device remove` is
@@ -76,6 +78,10 @@ The protocol version rises by one.
   rejected it, leasing's eviction already keeps a stray kind from blocking
   anything, and a kind leased less often than the time would pay a cold
   boot. It can be proposed again if workers show kinds piling up.
+- **Turn learning off with `warmPool.learn: false` (ADR 0051 §3).**
+  Rejected as the fix: it stops keeping every learned kind, the real ones
+  with the stray, and the stray comes back when learning is turned on
+  again within 24 hours.
 - **A virtual-device delete on `device remove`.** Rejected: the idle rules
   already delete an unkept device through the lifecycle, and a second
   delete path would need its own claim and revalidation.
