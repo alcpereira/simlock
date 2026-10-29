@@ -2743,22 +2743,35 @@ describe("warm pool learned kinds", () => {
     });
   });
 
-  it("forgetKinds forgets the kinds the match names, logs each, answers them, asks for a pass, and leaves their devices to the idle rules", async () => {
+  it("forgetKinds forgets the kinds the match names, logs each, answers them, and asks for a pass only when a kind matched, leaving their devices to the idle rules", async () => {
     const phone = device("kept", "ready", 0).spec;
     const state = await openMemoryState([warmPoolOwner]);
     new LearnedKinds(state).learn(phone, "l1", now - 2 * minute);
     new LearnedKinds(state).ended("l1", now - minute);
-    const rig = harness([device("kept", "ready", minute)], {
+    const pad = {
+      ...device("pad", "shutdown", 60 * minute),
+      spec: {
+        model: "iPad Pro",
+        osVersion: "26.0",
+        physical: false as const,
+        platform: "ios" as const,
+      },
+    };
+    const rig = harness([device("kept", "ready", minute), pad], {
       catalog: async () => [iosListing],
       state,
+      targets: [{ count: 1, model: "iPad Pro", osVersion: "26.0", platform: "ios" }],
     });
     expect([...(await rig.pool.targeted())]).toEqual(["kept"]);
 
     expect(rig.pool.forgetKinds({ model: "iPhone 16", platform: "ios" })).toEqual([]);
+    await rig.pool.settle();
+    expect(rig.bootCalls).toEqual([]);
     expect(rig.pool.forgetKinds({ model: "iPhone 15", platform: "ios" })).toEqual([phone]);
     await rig.pool.settle();
 
-    expect([...(await rig.pool.targeted())]).toEqual([]);
+    expect(rig.bootCalls).toHaveLength(1);
+    expect([...(await rig.pool.targeted())]).toEqual(["pad"]);
     expect(rig.shutdownCalls).toEqual([]);
     expect(new LearnedKinds(state).kinds(now)).toEqual([]);
     expect(
